@@ -12,6 +12,7 @@ mcp_showborders 0
 trans_showborders 0
 tcp_folderindent 0
 tcp_heights 4 25 54 64
+tcp_master_minheight 32
 envcp_min_height 27
 mcp_min_height 220 80
 misc_dpi_translate 50 100
@@ -101,8 +102,8 @@ macro flowProxy index
 					!previous{3} [proxy##index proxy##index 0 0] .   ; cull method is to set width to zero
 	
 ; -- cull if it is itself too wide for the section
-	set thisWPlus2Margins + + proxy##index{2} thisXMargin{0} thisXMargin{0}
-	set proxy##index thisWPlus2Margins{0}>tcp.custom.sectionMain{2} [proxy##index proxy##index 0 0] .
+	set thisWPlusMargin + proxy##index{2} * Scale sectionMargin{0}
+	set proxy##index thisWPlusMargin{0}>tcp.custom.sectionMain{2} [proxy##index proxy##index 0 0] .
 	
 ; -- cull if previous element is zero height
 	set proxy##index previous{3}==0 [proxy##index proxy##index 0 0] .
@@ -229,7 +230,7 @@ set sectionMarginXYWH 							h<singleRowH{0} + * Scale - [sectionMargin{0}] * 2 
 ;-- TCP SECTIONS (pt.1) --	
 
 set thisTcpfolderIndent							* - maxfolderdepth - maxfolderdepth folderdepth tcpfolderIndentSize
-set tcpFolderBalancer							tcpfolderBalanceType>0 * - maxfolderdepth folderdepth tcpfolderIndentSize
+set tcpFolderBalancer							tcpfolderBalanceType>0 * - maxfolderdepth ?trackpinned [0] folderdepth tcpfolderIndentSize
 set thisTcpLabelLength							+ Layout##thisLayout##-tcpLabelLength tcpfolderBalanceType==1 tcpFolderBalancer 0
 set actingParamCount							+ fx_parm_cnt ?fx_parm_cnt 0 ?Layout##thisLayout##-tcpFxparmPin{0} 1 0
 set actingFxCount								+ fx_cnt ?fx_cnt 0 ?Layout##thisLayout##-tcpFxPin{0} 1 0
@@ -237,18 +238,25 @@ set actingSendCount 							+ send_cnt ?send_cnt 0 ?Layout##thisLayout##-tcpSendP
 set actingEmbeddedUiCount						+ tcp_fxembed ?tcp_fxembed 0 ?Layout##thisLayout##-tcpFxembedPin{0} 1 0
 
 custom tcp.custom.tcpDiv
-	set tcp.custom.tcpDiv 						- + * Scale * [1 0 -1] thisTcpfolderIndent [0 h w 1] [0 1] 
+	set tcp.custom.tcpDiv 						- + * Scale trackpinned==2 [0] * [1 0 -1] thisTcpfolderIndent [0 h w 1] [0 1] 
 	set tcp.custom.tcpDiv.color 				* Scale [0 0 0 0 0 0 0 tcpDivOpacity{0}]								
 custom tcp.custom.sectionNumber
-	set tcp.custom.sectionNumber 				+ - [0 0 0 h] [0 0 0 1] * Scale [thisTcpfolderIndent 0 20]
+	set tcp.custom.sectionNumber 				+ - [0 0 0 h] trackpinned==2 [0] [0 0 0 1] * Scale trackpinned==2 [4 0 20] [thisTcpfolderIndent 0 20]
 	set tcp.custom.sectionNumber.color 			?trackcolor_valid [0 0 0 0 trackcolor_r trackcolor_g trackcolor_b] [0 0 0 0 tcpBgColR tcpBgColG tcpBgColB 255]
-	set tcp.foldercomp							?supercollapsedH{0} [0] + [tcp.custom.sectionNumber] * Scale [0 0 20 18]
-	set tcp.folder                  			?supercollapsedH{0} [0] + [tcp.custom.sectionNumber h] * Scale [0 -14 20 14]
+	set tcp.foldercomp							?trackpinned [0] ?supercollapsedH{0} [0] + [tcp.custom.sectionNumber] * Scale [0 0 20 18]
+	set tcp.folder                  			?trackpinned [0] ?supercollapsedH{0} [0] + [tcp.custom.sectionNumber h] * Scale [0 -14 20 14]
 	front tcp.folder
 	set tcp_folder_min							* Scale folderstate==1 50 32
 	set tcp.folder                				h<tcp_folder_min{0} folderstate<0 . [0] .
+	custom tcp.custom.folder_start 				'' 0 '' 'folder_start'
+	set bevelSize								tcpfolderIndentSize>20 20 tcpfolderIndentSize
+	set tcp.custom.folder_start					trackpinned==2 [0] ?supercollapsedH{0} [0] folderstate!=1 [0] + [tcp.custom.sectionNumber h] * Scale * bevelSize [0 -0.2 1 0.2]													
+	front tcp.custom.folder_start
 	brightnessFromRGB 							trackcolor_r trackcolor_g trackcolor_b tcpSectionNumberBrightness
-	set tcp.trackidx							?supercollapsedH{0} [0] + tcp.custom.sectionNumber * Scale folderstate==1 [0 16 0 -16] folderstate<0 [0 0 0 -10] [0]
+custom tcp.custom.pinned						'' 0 '' 'tcp_pinned'
+	set tcp.custom.pinned						!trackpinned [0] trackpinned==1 + [tcp.custom.sectionNumber] * Scale [20 0 4 h] * Scale [0 0 6 h]
+	front 										tcp.custom.pinned 
+set tcp.trackidx								?supercollapsedH{0} [0] + tcp.custom.sectionNumber ?trackpinned [0] * Scale folderstate==1 [0 16 0 -16] folderstate<0 [0 0 0 -10] [0]
 	set tcp.trackidx.margin	  					+ [0 0 0 0 0.5] * Scale + ?selDot{0} [0 0 4] [0] \
 																		  trackidx<100 [-1000 0 -1000 0] \
 																					folderstate=0 [0 -10 0 -10] [0]													
@@ -444,10 +452,13 @@ custom tcp.custom.labelBlockBg 					'' 0 '' 'tcp_labelBlock_bg'
 set tcp.recarm 									!tcpLabelBlock{2} [0] + [tcpLabelBlock tcpLabelBlock] * Scale [0 0 24 20]
 set tcp.recmon									!tcpLabelBlock{2} [0] + [tcp.recarm tcp.recarm] + [tcp.recarm{2}] * Scale [0 0 tcpRecmonW{0} 20] 
 set tcp.label									!tcpLabelBlock{2} [0] + [tcp.recmon tcp.recmon] + [tcp.recmon{2}] * Scale - [0 0 thisTcpLabelLength{0} 20] [0 0 6] 
-	set tcp.label.margin 						* Scale [6 0 2 0]
+	set tcp.label.margin 						* Scale tcp_hidden_overridden==1 [22 0 2 0] [6 0 2 0]
 	set tcp.label.font 							+ Layout##thisLayout##-tcpLabelSize{0} Scale{0}==1 [0] Scale{0}==1.5 [5] [10]
 	set tcp.label.color 						?recarm [255 80 100] ?trackcolor_valid ?colorTrackLabels cColorTextOnDark * textBrightnessMult{0} [200 200 200] * textBrightnessMult{0} [200 200 200] 
 	set tcp.label.color							?selInvertLabels{0} ?track_selected ?recarm [180 0 10] [38 38 38] . .
+custom tcp.custom.unhidden 						'' 0 '' 'unhidden'
+	set tcp.custom.unhidden						tcp_hidden_overridden==1 !tcpLabelBlock{2} [0] + [tcp.recmon tcp.recmon] + [tcp.recmon{2}] * Scale [2 0 16 20] [0]
+	front										tcp.custom.unhidden 
 set tcp.volume									!tcpLabelBlock{2} [0] + [tcp.label tcp.label] + [tcp.label{2}] * Scale [0 0 Layout##thisLayout##-tcpVolumeLength{0} 20] 
 	set thisVolL								* Scale Layout##thisLayout##-tcpVolumeLength{0}
 	set volKnobFlipW							* Scale 40
@@ -546,7 +557,7 @@ assignLoc tcp.fxparm Layout##thisLayout##-tcpFxparmLocation
 assignLoc tcp.fxlist Layout##thisLayout##-tcpFxLocation
 	set tcp.fxlist								!tcp_fxlist_enabled{0} [0] . ; if disabled in options
 	set tcp.fxlist.font 						+ * Scale [0 18 tcpFxMinWidth{0} tcpFxMaxWidth{0}] + [1] Scale{0}==1 [0] Scale{0}==1.5 [5] [10]
-	set tcp.fxlist.margin						* Scale [3 0 4 6 0.5 0 20 sectionMargin{0}] 	
+	set tcp.fxlist.margin						+ * Scale [3 0 4 6 0 0 20 sectionMargin{0}] [0 0 0 0 0.5]
 
 assignLoc tcp.sendlist Layout##thisLayout##-tcpSendLocation
 set tcp.sendlist								!tcp_sends_enabled{0} [0] . ; if disabled in options
@@ -742,8 +753,8 @@ macro masterFollow this thisW thisH xOffs noSpace
 	set this thisBS{0}>h [this this 0 this] !previous{3} [this this 0 0] .   ; cull method is to set width to zero
 	
 ; -- cull if it is itself too wide for the section
-	set thisWPlus2Margins + this{2} * Scale + xMargin{0} xMargin{0}
-	set this thisWPlus2Margins{0}>masterTcpSectionMain{2} [this this 0 0] .
+	set thisWPlusMargin + this{2} * Scale sectionMargin{0}
+	set this thisWPlusMargin{0}>masterTcpSectionMain{2} [this this 0 0] .
 	
 ; -- cull if previous element is zero height
 	set this previous{3}==0 [this this 0 0] .
@@ -781,6 +792,7 @@ set master.tcp.meter 								+ + master.tcp.custom.sectionMeter [masterTcpMeterB
 	set master.tcp.meter.scale.color.unlit.top     	!masterTcpMeterVals{0} [0 0 0 0 0 0 0 0] * textBrightnessMult{0} [255 255 255 120 0 0 0 0]	
 
 set masterTcpSectionMain							+ - [0 0 w] [0 0 master.tcp.custom.sectionMeter{2}] * Scale + [0 0 0 20] * 2 [0 0 0 sectionMargin{0}] 
+	set masterTcpSectionMain						trackpinned<2 . + masterTcpSectionMain * Scale [6 0 -6]
 	set masterTcpSectionMainMargin					+ masterTcpSectionMain * Scale + [sectionMargin{0} sectionMargin{0}] * -2 [0 0 sectionMargin{0} sectionMargin{0}]
 	
 set masterTcpSelectColRatio 					?track_selected / selectStrength{0} 100 0	
@@ -788,6 +800,9 @@ set masterTcpCol								+ * - 1 masterTcpSelectColRatio \
 													[masterTcpBgColR masterTcpBgColG masterTcpBgColB] \
 												* masterTcpSelectColRatio [255 255 255] 													
 brightnessFromRGB 								masterTcpCol{0} masterTcpCol{1} masterTcpCol{2} masterTcpColBrightness	
+custom master.tcp.custom.pinned					'' 0 '' 'tcp_pinned'
+	set master.tcp.custom.pinned				!trackpinned [0] * Scale trackpinned==1 [0 0 4 h] [0 0 6 h]
+	front 										master.tcp.custom.pinned
 
 ;reset values for 'masterFollow' macro
 set biggestY 0
@@ -858,13 +873,17 @@ set master.tcp.custom.tcp_selectionDotSel 		!selDot{0} [0] !track_selected [0] +
 front master.tcp.custom.tcp_selectionDot master.tcp.custom.tcp_selectionDotSel
 
 custom master.tcp.custom.sectionMain																
-	set master.tcp.custom.sectionMain			masterTcpSectionMain
+	set master.tcp.custom.sectionMain			masterTcpSectionMain 
 	set master.tcp.custom.sectionMain.color 	?visSections [0 0 0 0 50 50 255 100] [0 0 0 0 masterTcpCol{0} masterTcpCol{1} masterTcpCol{2} 255]
 
 custom master.tcp.custom.sectionBottom
-	set master.tcp.custom.sectionBottom 		- [0 masterTcpSectionMain{3} masterTcpSectionMain h] [0 0 0 masterTcpSectionMain{3}] 
+	set master.tcp.custom.sectionBottom 		+ - [0 masterTcpSectionMain{3} masterTcpSectionMain h] [0 0 0 masterTcpSectionMain{3}] trackpinned==2 * Scale [6] [0]
 	set master.tcp.custom.sectionBottom.color 	?visSections [0 0 0 0 100 255 100 150] [0 0 0 0 38 38 38 255]	
 	set masterTcpSectionBottomMargin			+ master.tcp.custom.sectionBottom * Scale * sectionMargin{0} [1 1 -2 -2]
+
+custom master.tcp.custom.pinnedInfill
+	set master.tcp.custom.pinnedInfill			trackpinned==2 + * scale [0 0 6] [0 0 0 h] [0]
+	set master.tcp.custom.pinnedInfill.color	[0 0 0 0 51 51 51]
 
 set master.tcp.fxparm							masterTcpSectionBottomMargin
 	set master.tcp.fxparm.margin 				* Scale [3 0 4 0 1 0 0 4]
@@ -922,8 +941,8 @@ macro envFollow this thisW thisH xOffs noSpace
 				!previous{3} [this this 0 0] .   ; cull method is to set width to zero
 	
 ; -- cull if it is itself too wide for the section
-	set thisWPlus2Margins + + this{2} thisXMargin{0} thisXMargin{0}}
-	set this thisWPlus2Margins{0}>envcp.custom.sectionMain{2} [this this 0 0] .
+	set thisWPlusMargin + this{2} thisXMargin{0}
+	set this thisWPlusMargin{0}>envcp.custom.sectionMain{2} [this this 0 0] .
 	
 ; -- cull if previous element is zero height
 	set this previous{3}==0 [this this 0 0] .
@@ -949,13 +968,16 @@ set envCustomColorRatio 							?trackcolor_valid / envCustomColorDepth{0} 100 0
 
 macro drawEnvCP Scale
 
-set envcp.size										* Scale [300 100 40] 
+set envcp.size										* Scale [300 100] 
 set singleRowH 										* Scale + 20 * 2 sectionMargin{0}
 set ySqueeze 										h<singleRowH{0} - * Scale sectionMargin{0} * 0.5 - singleRowH{0} h * Scale sectionMargin{0}	
-set thisTcpfolderIndentS							* Scale thisTcpfolderIndent{0}
+set thisTcpfolderIndentS							* Scale trackpinned==2 4 thisTcpfolderIndent{0}
 custom envcp.custom.sectionMain	
 	set envcp.custom.sectionMain					?indentEnvcp{0} - [thisTcpfolderIndentS{0} ySqueeze w h] [0 0 thisTcpfolderIndentS{0}] [0 ySqueeze w h] 
-	set envcp.custom.sectionMain.color				?visSections [0 0 0 0 100 255 150 150] [0 0 0 0 0 0 0 0]
+	set envcp.custom.sectionMain.color				?visSections [0 0 0 0 100 255 150 80] [0 0 0 0 0 0 0 0]
+custom envcp.custom.pinned							'' 0 '' 'tcp_pinned'
+		set envcp.custom.pinned						trackpinned<2 [0] * Scale [0 0 6 h]
+		front 										envcp.custom.pinned 
 set biggestY 0
 set xOffs 0
 set noSpace 0
@@ -1014,7 +1036,7 @@ envFollow envcp.learn								20 20 0 0
 envFollow envcp.hide								36 20 0 0
 
 custom envcp.custom.indentInfill
-	set envcp.custom.indentInfill					?indentEnvcp{0} * Scale [0 0 thisTcpfolderIndent{0} h] [0 0 0 0]
+	set envcp.custom.indentInfill					?indentEnvcp{0} * Scale trackpinned==2 [0 0 4 h] [0 0 thisTcpfolderIndent{0} h] [0 0 0 0]
 	set envcp.custom.indentInfill.color				[0 0 0 0 51 51 51]
 
 custom envcp.custom.envcpDiv
@@ -1024,6 +1046,9 @@ custom envcp.custom.envcpDiv
 custom envcp.custom.sectionMainBg
 	set envcp.custom.sectionMainBg					[envcp.custom.sectionMain 0 envcp.custom.sectionMain h]
 	set envcp.custom.sectionMainBg.color			?visSections [0 0 0 0 255 50 255 60] [0 0 0 0 envcpCol{0} envcpCol{1} envcpCol{2} 255]
+	
+set minEnvcpW										+ thisTcpfolderIndentS * Scale envcpLabelBlockW
+set envcp.size										[. . minEnvcpW]
 
 endMacro
 
@@ -1823,8 +1848,8 @@ set master.mcp.fxlist.font 							+ * Scale [1 18 80 80] Scale{0}==1 [0] Scale{0
 	set master.mcp.fxlist.margin					* [Scale Scale Scale Scale 1 Scale Scale Scale] [3 0 4 6 0.5 0 20 2]
 set master.mcp.sendlist.font 						+ * Scale [1 18 80 80] Scale{0}==1 [0] Scale{0}==1.5 [5] [10]	
 	set master.mcp.sendlist.margin 					* [Scale Scale Scale Scale 1 Scale Scale Scale] [2 0 0 0 0 0 0 0 2]
-set master.mcp.fxparm.font 							+ * Scale [1 24] Scale{0}==1 [0] Scale{0}==1.5 [5] [10]
- 	set master.mcp.fxparm.margin					* [Scale Scale Scale Scale 1 Scale Scale Scale] [3 0 4 6 0.5 0 0 2]	
+set master.mcp.fxparm.font 							mcp.fxparm.font
+ 	set master.mcp.fxparm.margin					mcp.fxparm.margin
 
 custom master.mcp.custom.mcp_selectionDot 			'' 0 '' 'tcp_selectionDot'
 set master.mcp.custom.mcp_selectionDot 				!selDot{0} [0] ?track_selected [0] + + [master.mcp.custom.darkBox master.mcp.custom.darkBox] [master.mcp.custom.darkBox{2} master.mcp.custom.darkBox{3}] * Scale [-4 -14 8 8]
@@ -1873,8 +1898,8 @@ macro transFollow this thisW thisH
 	set this 								thisBS{0}>h [this this 0 this] !previous{3} [this this 0 0] .   ; cull method is to set width to zero
  
 ; -- cull if it is itself too wide for the section
-	set thisWPlus2Margins 					+ this{2} * Scale + transMargin transMargin
-	set this 								thisWPlus2Margins{0}>trans.custom.sectionRight{2} [this this 0 0] .
+	set thisWPlusMargin 					+ this{2} * Scale transMargin
+	set this 								thisWPlusMargin{0}>trans.custom.sectionRight{2} [this this 0 0] .
 	
 ; -- this is the new previous	
 	set previous 							this
@@ -1971,16 +1996,17 @@ transFollow trans.custom.sectionRate 		transSectionRateW{0} 36
 set hide_trans.automode 					0
 transFollow trans.automode 					58 36
 set hide_trans.custom.sectionBpm 			0
-transFollow trans.custom.sectionBpm			60 36
+transFollow trans.custom.sectionBpm			78 36
 	set trans.custom.sectionBpm.color		?visSections [0 0 0 0 100 100 255 150] [0 0 0 1 0 0 0 0]	
-	set trans.bpm.tap 						+ [trans.custom.sectionBpm trans.custom.sectionBpm trans.custom.sectionBpm] * Scale [0 0 0 20]
+	set trans.bpm.tap 						trans.custom.sectionBpm{w}<1 [0] + [trans.custom.sectionBpm trans.custom.sectionBpm] * Scale [0 0 60 20]
 	set trans.bpm.tap.font  				+ [1] Scale{0}==1 [0] Scale{0}==1.5 [5] [10]
 	set trans.bpm.tap.color 				* textBrightnessMult{0} [160 160 160]
 	set trans.bpm.tap.margin 				+ * Scale [0 2 0 0] [0 0 0 0 0.5]		
-	set trans.bpm.edit 						+ + [trans.bpm.tap trans.bpm.tap trans.bpm.tap] [0 trans.bpm.tap{3}] * Scale [0 0 0 16]
+	set trans.bpm.edit 						trans.custom.sectionBpm{w}<1 [0] + + [trans.bpm.tap trans.bpm.tap trans.bpm.tap] [0 trans.bpm.tap{3}] * Scale [0 0 0 16]
 	set trans.bpm.edit.font  				+ [1] Scale{0}==1 [0] Scale{0}==1.5 [5] [10]
 	set trans.bpm.edit.color 				trans.bpm.tap.color 
-	set trans.bpm.edit.margin 				+ * Scale [0 0 0 6] [0 0 0 0 0.5]	
+	set trans.bpm.edit.margin 				+ * Scale [0 0 0 6] [0 0 0 0 0.5]
+	set trans.timebase						trans.custom.sectionBpm{w}<1 [0] + + [trans.custom.sectionBpm trans.custom.sectionBpm] [trans.bpm.tap{2}] * Scale [0 0 16 36]
 	
 set hide_trans.custom.sectionSig 			!trans_flags&4 1 0
 transFollow trans.custom.sectionSig			40 36
