@@ -7,3 +7,10 @@ Modified original theme to add readability, contrast and brightness. Especially 
 ## Install
 1. Download latest from [Releases](https://github.com/inglar/reaper-v7-theme-inglar/releases/latest)
 2. Copy to `~/Library/Application Support/REAPER/ColorThemes`
+
+## Comparison
+Inglar Theme
+![Inglar Theme](./examples/inglar-theme.png?raw=true)
+
+Default Theme
+![Default Theme](./examples/default-theme.png?raw=true)
