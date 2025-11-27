@@ -10,7 +10,9 @@ Modified original theme to add readability, contrast and brightness. Especially 
 
 ## Comparison
 Inglar Theme
-![Inglar Theme](./examples/inglar-theme.png?raw=true)
+![Inglar Theme](./examples/inglar-theme-main.png?raw=true)
+![Inglar Theme](./examples/inglar-theme-mixer.png?raw=true)
 
 Default Theme
-![Default Theme](./examples/default-theme.png?raw=true)
+![Default Theme](./examples/default-theme-main.png?raw=true)
+![Default Theme](./examples/default-theme-mixer.png?raw=true)
