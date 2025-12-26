@@ -57,7 +57,7 @@ set selectColRatio 								?track_selected / selectStrength{0} 100 0
 macro flowProxy index
 
 	set proxy##index 	tcpFlowLocation##index==1 tcpLabelBlock	\
-						tcpFlowLocation##index==2 tcp.volume.label	\
+						tcpFlowLocation##index==2 tcpInfoblockBlock \
 						tcpFlowLocation##index==3 tcpMSBlock	\
 						tcpFlowLocation##index==4 tcp.io	\
 						tcpFlowLocation##index==5 tcpFxBlock	\
@@ -116,7 +116,7 @@ endmacro
 
 macro attachProxy index
 	set tcpLabelBlock 		tcpFlowLocation##index==1 proxy##index
-	set tcp.volume.label 	tcpFlowLocation##index==2 proxy##index
+	set tcpInfoblockBlock	tcpFlowLocation##index==2 proxy##index
 	set tcpMSBlock 			tcpFlowLocation##index==3 proxy##index
 	set tcp.io 				tcpFlowLocation##index==4 proxy##index
 	set tcpFxBlock 			tcpFlowLocation##index==5 proxy##index
@@ -354,12 +354,16 @@ doHideLogic 									tcpInputBlock Layout##thisLayout##-hideTcpInputBlock{0}
 doHideLogic 									tcp.env Layout##thisLayout##-hideTcpEnv{0}
 doHideLogic 									tcp.phase Layout##thisLayout##-hideTcpPhase{0}
 doHideLogic										meterValues Layout##thisLayout##-hideTcpMeterValues{0}
+set hide_tcpInfoBlock							?supercollapsedH{0} [1] 
+set hide_tcpInfoBlock 							!feature_check_infoblock [1] ; always treat infoblock as hidden if not supported by reaper
 
 ;-- TCP SECTIONS (pt.2) --	
 
 set tcpLabelBlockW								+ + + thisTcpLabelLength{0} Layout##thisLayout##-tcpVolumeLength{0} 20 tcpRecmonW{0} ; 20 is the recarm width
+set tcpLabelBlockW								!hide_tcp.volume.label{0} ?Layout##thisLayout##-useInfoBlock{0} + tcpLabelBlockW 48 ; create space in LabelBlock for volume label when infoBlock is using its flow slot
 set tcpInputBlockW								+ 20 Layout##thisLayout##-tcpRecinputLength{0} ; 20 is the width of tcp.fxin
-set tcpPanBlockW								trackpanmode<=3 !hide_labelsValues{0} 58 20 trackpanmode==5 !hide_labelsValues{0} 80 42 trackpanmode==6 !hide_labelsValues{0} 100 60
+set hide_panValues								!hide_labelsValues{0} 0 1
+set tcpPanBlockW								trackpanmode<=3 !hide_panValues{0} 58 20 trackpanmode==5 !hide_panValues{0} 80 42 trackpanmode==6 !hide_panValues{0} 100 60
 set longestTcpBlock								* Scale + + sectionMargin{0} sectionMargin{0} tcpLabelBlockW{0}>tcpInputBlockW{0} tcpLabelBlockW{0} tcpInputBlockW{0}
 set tcp.custom.sectionMain 						tcp.custom.sectionMain{2}<longestTcpBlock{0} [tcp.custom.sectionMain tcp.custom.sectionMain longestTcpBlock{0} tcp.custom.sectionMain] .
 	set tcpSectionMainMargin 					+ tcp.custom.sectionMain + * Scale [sectionMargin{0}] * -2 * Scale [0 0 sectionMargin{0}]
@@ -411,14 +415,14 @@ custom tcp.custom.labelBlock
 custom tcp.custom.inputBlock
 
 set tcpLabelBlock 							?hide_tcpLabelBlock{0} [0 0 0] [0 0 tcpLabelBlockW{0}]
-set tcp.volume.label						?hide_tcp.volume.label{0} [0 0 0] [0 0 48]
+set tcpInfoblockBlock                       ?hide_tcpInfoBlock{0} [0 0 0] ?Layout##thisLayout##-useInfoBlock{0} [0 0 60] ?hide_tcp.volume.label{0} [0 0 0] [0 0 48]
 set tcpMSBlock								?hide_tcpMSBlock{0} [0 0 0] [0 0 39]
 set tcp.io									?hide_tcp.io{0} [0 0 0] [0 0 30]
 set tcpFxBlock								?hide_tcpFxBlock{0} [0 0 0] [0 0 36]
 set tcpPanBlock								?hide_tcpPanBlock{0} [0 0 0] [0 0 tcpPanBlockW]
 set tcp.recmode								?hide_tcp.recmode{0} [0 0 0] [0 0 42]
 set tcpInputBlock							?hide_tcpInputBlock{0} [0 0 0] [0 0 tcpInputBlockW{0}]
-set tcp.env 								?hide_tcp.env{0} [0 0 0] [0 0 40]
+set tcp.env 								?hide_tcp.env{0} [0 0 0] ?Layout##thisLayout##-useInfoBlock{0} [0 0 20] [0 0 40]
 set tcp.phase 								?hide_tcp.phase{0} [0 0 0] [0 0 16]
 set previous 								+ [tcpSectionMainMargin tcpSectionMainMargin] * Scale - [0 0 0 20] [xMargin{0}] ; mainNullElement
 
@@ -444,7 +448,9 @@ attachProxy 8
 attachProxy 9
 attachProxy 10
 
-					
+custom tcp.custom.labelBlockVis
+	set tcp.custom.labelBlockVis tcpLabelBlock
+	set tcp.custom.labelBlockVis.color [0 0 0 0 255 120 0 1]
 custom tcp.custom.labelBlockBg 					'' 0 '' 'tcp_labelBlock_bg'
 	custom tcp.custom.labelBlockBgSel			'' 0 '' 'tcp_labelBlock_bg_sel'
 	set tcp.custom.labelBlockBg					+ * Scale [0 0 -2] ?selInvertLabels{0} ?track_selected [0] tcpLabelBlock tcpLabelBlock
@@ -463,9 +469,15 @@ set tcp.volume									!tcpLabelBlock{2} [0] + [tcp.label tcp.label] + [tcp.labe
 	set thisVolL								* Scale Layout##thisLayout##-tcpVolumeLength{0}
 	set volKnobFlipW							* Scale 40
 	set tcp.volume.fadermode 					thisVolL{0}<=volKnobFlipW{0} [1] [0]	
-set tcp.volume.label.font						Scale{0}==1 [1] Scale{0}==1.5 [6] [11]
+set tcp.volume.label							!hide_tcp.volume.label{0} !Layout##thisLayout##-useInfoBlock{0} tcpInfoblockBlock + [tcp.volume{2}] [tcp.volume tcpLabelBlock 48 tcpLabelBlock]
+	set tcp.volume.label.font					Scale{0}==1 [1] Scale{0}==1.5 [6] [11]
 	set tcp.volume.label.color					* textBrightnessMult{0} tcpMainSecColBrightness{0}<150 [220 220 220] [38 38 38]
 	set tcp.volume.label.margin					* Scale [6 0 0 0 0]
+set tcp.infoblock								?Layout##thisLayout##-useInfoBlock{0} tcpInfoblockBlock
+	set tcp.infoblock.font						Scale{0}==1 [2] Scale{0}==1.5 [7] [12]
+	set tcp.infoblock.color						[0 0 0 210] ; [0 0 0 168] ; * textBrightnessMult{0} tcpMainSecColBrightness{0}<150 [220 220 220] [38 38 38]
+	set tcp.infoblock.color.metervalue				?recarm [254 64 0 255] [0 254 149 192]
+	set tcp.infoblock.margin					+ * Scale [0 0 0 0] [0 0 0 0 0.5]
 set tcp.mute 									!tcpMSBlock{2} [0] + [tcpMSBlock tcpMSBlock] * Scale [0 0 20 20]
 set tcp.solo 									!tcpMSBlock{2} [0] + [tcp.mute tcp.mute] * Scale [19 0 20 20]
 set tcp.fx										!tcpFxBlock{2} [0] + [tcpFxBlock tcpFxBlock] * Scale [0 0 20 20]
@@ -473,7 +485,7 @@ set tcp.fx										!tcpFxBlock{2} [0] + [tcpFxBlock tcpFxBlock] * Scale [0 0 20
 	front tcp.fxbyp 
 set tcp.custom.panBlock							?visSections tcpPanBlock [0]
 	set tcp.custom.panBlock.color 				?visSections [0 0 0 0 255 255 100 255] [0 0 0 0 0 0 0]
-set panLabelW									* Scale !hide_labelsValues{0} 38 0
+set panLabelW									* Scale !hide_panValues{0} 38 0
 set tcp.pan.label								!tcpPanBlock{2} [0] trackpanmode<=3 + [tcpPanBlock tcpPanBlock panLabelW{0}] * Scale [0 0 0 20] + [tcpPanBlock tcpPanBlock panLabelW{0}] * Scale [0 0 0 10]
 	set tcp.pan.label.color						* textBrightnessMult{0} tcpMainSecColBrightness{0}<150 [220 220 220] [38 38 38]
 	set tcp.pan.label.margin					+ [0 0 0 0 1] * Scale [0 0 4]
@@ -598,6 +610,7 @@ define_parameter LayoutA-tcpInputFontSize 				'Layout A - TCP Input Font Size' 1
 define_parameter LayoutA-tcpRecinputLength 				'Layout A - TCP Input Length' 100 40 400
 define_parameter LayoutA-tcpMeterWidth 					'Layout A - TCP Meter Width' 20 10 300
 define_parameter LayoutA-tcpMeterBorder 				'Layout A - TCP Meter Border' 2 0 8
+define_parameter LayoutA-useInfoBlock 					'Layout A - TCP use InfoBlock' 0 0 1
 
 define_parameter LayoutA-hideTcpLabelBlock 				'Layout A - Visflag Track Label Block' 0 0 15
 define_parameter LayoutA-hideTcpRecmon 					'Layout A - Visflag Track Recmon' 4 0 15
@@ -646,6 +659,7 @@ define_parameter LayoutB-tcpInputFontSize 				'Layout B - TCP Input Font Size' 1
 define_parameter LayoutB-tcpRecinputLength 				'Layout B - TCP Input Length' 100 40 400
 define_parameter LayoutB-tcpMeterWidth 					'Layout B - TCP Meter Width' 20 10 300
 define_parameter LayoutB-tcpMeterBorder 				'Layout B - TCP Meter Border' 2 0 8
+define_parameter LayoutB-useInfoBlock 					'Layout B - TCP use InfoBlock' 0 0 1
 
 define_parameter LayoutB-hideTcpLabelBlock 				'Layout B - Visflag Track Label Block' 0 0 15
 define_parameter LayoutB-hideTcpRecmon 					'Layout B - Visflag Track Recmon' 0 0 15
@@ -693,6 +707,7 @@ define_parameter LayoutC-tcpInputFontSize 				'Layout C - TCP Input Font Size' 1
 define_parameter LayoutC-tcpRecinputLength 				'Layout C - TCP Input Length' 140 40 400
 define_parameter LayoutC-tcpMeterWidth 					'Layout C - TCP Meter Width' 100 10 300
 define_parameter LayoutC-tcpMeterBorder 				'Layout C - TCP Meter Border' 2 0 8
+define_parameter LayoutC-useInfoBlock 					'Layout C - TCP use InfoBlock' 0 0 1
 
 define_parameter LayoutC-hideTcpLabelBlock 				'Layout C - Visflag Track Label Block' 0 0 15
 define_parameter LayoutC-hideTcpRecmon 					'Layout C - Visflag Track Recmon' 4 0 15
@@ -2133,4 +2148,4 @@ layout_dpi_translate 	'' 			1.74 	'200%_A'
 
 
 
-define_parameter themeVersionDate		'Theme Version Date' 240503 240503 240503
+define_parameter themeVersionDate		'Theme Version Date' 251214 251214 251214
